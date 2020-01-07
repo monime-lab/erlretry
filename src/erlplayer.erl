@@ -13,7 +13,9 @@
 
 %% API
 -export([play/2, play/3, play/4, play/5]).
--export([await/1, await/2, async_play/3, async_play/4, async_play/5, async_play/6, async_play/7]).
+-export([async_play/3, async_play/4, async_play/5, async_play/6, async_play/7]).
+-export([async_play_in_bg/3, async_play_in_bg/4, async_play_in_bg/5, async_play_in_bg/6, async_play_in_bg/7]).
+-export([await/1, await/2]).
 
 
 play(Fun, Opts) ->
@@ -88,6 +90,27 @@ async_play(Fun, Opts, Retries, Delay, MaxDelay, MaxJitter, Callback)
     _:Reason ->
       Replay({error, Reason})
   end.
+
+async_play_in_bg(Fun, Opts, Callback) ->
+  async_play_in_bg(Fun, Opts, ?MAX_RETRIES, Callback).
+
+async_play_in_bg(Fun, Opts, Retries, Callback) ->
+  async_play_in_bg(Fun, Opts, Retries, 0, Callback).
+
+async_play_in_bg(Fun, Opts, Retries, Delay, Callback) ->
+  async_play_in_bg(Fun, Opts, Retries, Delay, ?MAX_DELAY, ?MAX_JITTER, Callback).
+
+async_play_in_bg(Fun, Opts, Retries, Delay, MaxDelay, Callback) ->
+  async_play_in_bg(Fun, Opts, Retries, Delay, MaxDelay, ?MAX_JITTER, Callback).
+
+
+async_play_in_bg(Fun, Opts, Retries, Delay, MaxDelay, MaxJitter, Callback)
+  when is_function(Fun), is_list(Opts), is_integer(Retries),
+  Retries >= 0, is_integer(MaxDelay), is_integer(MaxJitter) ->
+  PlayInfo = #play_info{function = Fun, options = Opts,
+    retries = Retries, base_delay = Delay, max_delay = MaxDelay,
+    max_jitter = MaxJitter},
+  try_async_play(PlayInfo, Callback, undefined).
 
 await(Ref) ->
   await(Ref, 10000).
