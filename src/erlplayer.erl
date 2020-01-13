@@ -126,14 +126,17 @@ await(Ref, Timeout) ->
 
 retry_play(#play_info{retries = 0}, Error) ->
   Error;
-retry_play(#play_info{} = PLayInfo, Error) ->
-  do_retry_play(PLayInfo, Error, 1).
+retry_play(#play_info{} = PlayInfo, Error) ->
+  do_retry_play(PlayInfo, Error, 1).
 
 
 do_retry_play(#play_info{retries = Retries}, Error, Attempts) when Attempts > Retries ->
   Error;
 do_retry_play(PlayInfo, Error, Attempts) ->
   NextDelay = calculate_next_delay(PlayInfo, Attempts),
+  error_logger:warning_msg("Erlplay execution failed: ~p. "
+  "Remaining attempts: ~p. Next attempt in: ~pms",
+    [Error, Attempts, NextDelay]),
   timer:sleep(NextDelay),
   #play_info{function = Fun, options = Opts} = PlayInfo,
   try apply(Fun, Opts) of
