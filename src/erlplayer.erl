@@ -175,8 +175,8 @@ handle_async_play_result(Result, CallbackOrRef) ->
       try
         apply(Fun, [Result])
       catch
-        _:X ->
-          error_logger:error_msg("~p", [{X, erlang:get_stacktrace()}])
+        _:X:Stacktrace ->
+          error_logger:error_msg("~p", [{X, Stacktrace}])
       end,
       ok
   end.
