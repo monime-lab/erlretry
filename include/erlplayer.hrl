@@ -6,8 +6,8 @@
 -define(SERVER, ?MODULE).
 
 -define(MAX_RETRIES, 5).
--define(MAX_JITTER, 500).
 -define(MAX_DELAY, 32000).
+-define(DEFAULT_JITTER, 500).
 
 -define(STAGE_ERR_LOG, <<"Processing execution error. Giving up">>).
 

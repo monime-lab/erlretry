@@ -25,10 +25,10 @@ play(Fun, Opts, Retries) ->
   play(Fun, Opts, Retries, 0).
 
 play(Fun, Opts, Retries, Delay) ->
-  play(Fun, Opts, Retries, Delay, ?MAX_DELAY, ?MAX_JITTER).
+  play(Fun, Opts, Retries, Delay, ?MAX_DELAY, ?DEFAULT_JITTER).
 
 play(Fun, Opts, Retries, Delay, MaxDelay) ->
-  play(Fun, Opts, Retries, Delay, MaxDelay, ?MAX_JITTER).
+  play(Fun, Opts, Retries, Delay, MaxDelay, ?DEFAULT_JITTER).
 
 
 play(Fun, Opts, Retries, Delay, MaxDelay, MaxJitter)
@@ -56,10 +56,10 @@ async_play(Fun, Opts, Retries, Callback) ->
   async_play(Fun, Opts, Retries, 0, Callback).
 
 async_play(Fun, Opts, Retries, Delay, Callback) ->
-  async_play(Fun, Opts, Retries, Delay, ?MAX_DELAY, ?MAX_JITTER, Callback).
+  async_play(Fun, Opts, Retries, Delay, ?MAX_DELAY, ?DEFAULT_JITTER, Callback).
 
 async_play(Fun, Opts, Retries, Delay, MaxDelay, Callback) ->
-  async_play(Fun, Opts, Retries, Delay, MaxDelay, ?MAX_JITTER, Callback).
+  async_play(Fun, Opts, Retries, Delay, MaxDelay, ?DEFAULT_JITTER, Callback).
 
 
 async_play(Fun, Opts, Retries, Delay, MaxDelay, MaxJitter, Callback)
@@ -98,10 +98,10 @@ async_play_in_bg(Fun, Opts, Retries, Callback) ->
   async_play_in_bg(Fun, Opts, Retries, 0, Callback).
 
 async_play_in_bg(Fun, Opts, Retries, Delay, Callback) ->
-  async_play_in_bg(Fun, Opts, Retries, Delay, ?MAX_DELAY, ?MAX_JITTER, Callback).
+  async_play_in_bg(Fun, Opts, Retries, Delay, ?MAX_DELAY, ?DEFAULT_JITTER, Callback).
 
 async_play_in_bg(Fun, Opts, Retries, Delay, MaxDelay, Callback) ->
-  async_play_in_bg(Fun, Opts, Retries, Delay, MaxDelay, ?MAX_JITTER, Callback).
+  async_play_in_bg(Fun, Opts, Retries, Delay, MaxDelay, ?DEFAULT_JITTER, Callback).
 
 
 async_play_in_bg(Fun, Opts, Retries, Delay, MaxDelay, MaxJitter, Callback)
