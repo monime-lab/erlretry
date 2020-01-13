@@ -131,11 +131,13 @@ retry_play(#play_info{} = PlayInfo, Error) ->
 
 
 do_retry_play(#play_info{retries = Retries}, Error, Attempts) when Attempts > Retries ->
+  error_logger:warning_msg("Erlplay gave up after ~p retries. "
+  "Last failure: ~p", [Retries, Error]),
   Error;
 do_retry_play(PlayInfo, Error, Attempts) ->
   NextDelay = calculate_next_delay(PlayInfo, Attempts),
   error_logger:warning_msg("Erlplay execution failed: ~p. "
-  "Remaining attempts: ~p. Next attempt in: ~pms",
+  "Remaining attempts: ~p. Will retry in: ~pms",
     [Error, (PlayInfo#play_info.retries - Attempts) + 1, NextDelay]),
   timer:sleep(NextDelay),
   #play_info{function = Fun, options = Opts} = PlayInfo,
