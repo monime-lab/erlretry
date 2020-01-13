@@ -136,7 +136,7 @@ do_retry_play(PlayInfo, Error, Attempts) ->
   NextDelay = calculate_next_delay(PlayInfo, Attempts),
   error_logger:warning_msg("Erlplay execution failed: ~p. "
   "Remaining attempts: ~p. Next attempt in: ~pms",
-    [Error, Attempts, NextDelay]),
+    [Error, (PlayInfo#play_info.retries - Attempts) + 1, NextDelay]),
   timer:sleep(NextDelay),
   #play_info{function = Fun, options = Opts} = PlayInfo,
   try apply(Fun, Opts) of
