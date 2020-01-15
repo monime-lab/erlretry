@@ -12,69 +12,53 @@
 -include("erlplayer.hrl").
 
 %% API
--export([play/2, play/3, play/4, play/5]).
--export([async_play/3, async_play/4, async_play/5, async_play/6, async_play/7]).
--export([async_play_in_bg/3, async_play_in_bg/4, async_play_in_bg/5, async_play_in_bg/6, async_play_in_bg/7]).
+-export([play/1, play/2, play/3]).
+-export([bg_play/1, bg_play/2, bg_play/3, bg_play/4]).
+-export([play_or_bgretry/1, play_or_bgretry/2, play_or_bgretry/3, play_or_bgretry/4]).
 -export([await/1, await/2]).
 
+play(Fun) ->
+  play(Fun, []).
 
-play(Fun, Opts) ->
-  play(Fun, Opts, ?MAX_RETRIES).
+play(Fun, Args) ->
+  play(Fun, Args, []).
 
-play(Fun, Opts, Retries) ->
-  play(Fun, Opts, Retries, 0).
-
-play(Fun, Opts, Retries, Delay) ->
-  play(Fun, Opts, Retries, Delay, ?MAX_DELAY, ?DEFAULT_JITTER).
-
-play(Fun, Opts, Retries, Delay, MaxDelay) ->
-  play(Fun, Opts, Retries, Delay, MaxDelay, ?DEFAULT_JITTER).
-
-
-play(Fun, Opts, Retries, Delay, MaxDelay, MaxJitter)
-  when is_function(Fun), is_list(Opts), is_integer(Retries),
-  Retries >= 0, is_integer(MaxDelay), is_integer(MaxJitter) ->
-  PlayInfo = #play_info{function = Fun, options = Opts,
-    retries = Retries, base_delay = Delay, max_delay = MaxDelay,
-    max_jitter = MaxJitter},
-  try apply(Fun, Opts) of
+play(Fun, Args, Opts) when is_function(Fun), is_list(Args) ->
+  Meta = create_meta(Fun, Args, Opts),
+  try apply(Fun, Args) of
     error ->
-      retry_play(PlayInfo, error);
+      retry_play(Meta, error);
     {error, _} = Error ->
-      retry_play(PlayInfo, Error);
+      retry_play(Meta, Error);
     Result ->
       Result
   catch
     _:Reason ->
-      retry_play(PlayInfo, {error, Reason})
+      retry_play(Meta, {error, Reason})
   end.
 
-async_play(Fun, Opts, Callback) ->
-  async_play(Fun, Opts, ?MAX_RETRIES, Callback).
+play_or_bgretry(Fun) ->
+  play_or_bgretry(Fun, []).
 
-async_play(Fun, Opts, Retries, Callback) ->
-  async_play(Fun, Opts, Retries, 0, Callback).
+play_or_bgretry(Fun, Args) ->
+  play_or_bgretry(Fun, Args, undefined).
 
-async_play(Fun, Opts, Retries, Delay, Callback) ->
-  async_play(Fun, Opts, Retries, Delay, ?MAX_DELAY, ?DEFAULT_JITTER, Callback).
+play_or_bgretry(Fun, Args, Opts) when is_list(Opts) ->
+  play_or_bgretry(Fun, Args, Opts, undefined);
 
-async_play(Fun, Opts, Retries, Delay, MaxDelay, Callback) ->
-  async_play(Fun, Opts, Retries, Delay, MaxDelay, ?DEFAULT_JITTER, Callback).
+play_or_bgretry(Fun, Args, Callback) ->
+  play_or_bgretry(Fun, Args, [], Callback).
 
-
-async_play(Fun, Opts, Retries, Delay, MaxDelay, MaxJitter, Callback)
-  when is_function(Fun), is_list(Opts), is_integer(Retries),
-  Retries >= 0, is_integer(MaxDelay), is_integer(MaxJitter) ->
+play_or_bgretry(Fun, Args, Opts, Callback)
+  when is_function(Fun), is_list(Args) ->
   Replay =
     fun(InitialError) ->
-      PlayInfo = #play_info{function = Fun, options = Opts,
-        retries = Retries, base_delay = Delay, max_delay = MaxDelay,
-        max_jitter = MaxJitter},
-      try_async_play(PlayInfo, Callback, InitialError)
+      Meta = create_meta(Fun, Args, Opts),
+      try_async_play(Meta, Callback, InitialError)
     end,
   %% First attempt playing in the calling process,
   %% then retry in the background on failure
-  try apply(Fun, Opts) of
+  try apply(Fun, Args) of
     error ->
       Replay(error);
     {error, _} = Error ->
@@ -91,26 +75,22 @@ async_play(Fun, Opts, Retries, Delay, MaxDelay, MaxJitter, Callback)
       Replay({error, Reason})
   end.
 
-async_play_in_bg(Fun, Opts, Callback) ->
-  async_play_in_bg(Fun, Opts, ?MAX_RETRIES, Callback).
+bg_play(Fun) ->
+  bg_play(Fun, []).
 
-async_play_in_bg(Fun, Opts, Retries, Callback) ->
-  async_play_in_bg(Fun, Opts, Retries, 0, Callback).
+bg_play(Fun, Args) ->
+  bg_play(Fun, Args, undefined).
 
-async_play_in_bg(Fun, Opts, Retries, Delay, Callback) ->
-  async_play_in_bg(Fun, Opts, Retries, Delay, ?MAX_DELAY, ?DEFAULT_JITTER, Callback).
+bg_play(Fun, Args, Opts) when is_list(Opts) ->
+  bg_play(Fun, Args, Opts, undefined);
 
-async_play_in_bg(Fun, Opts, Retries, Delay, MaxDelay, Callback) ->
-  async_play_in_bg(Fun, Opts, Retries, Delay, MaxDelay, ?DEFAULT_JITTER, Callback).
+bg_play(Fun, Args, Callback) ->
+  bg_play(Fun, Args, [], Callback).
 
-
-async_play_in_bg(Fun, Opts, Retries, Delay, MaxDelay, MaxJitter, Callback)
-  when is_function(Fun), is_list(Opts), is_integer(Retries),
-  Retries >= 0, is_integer(MaxDelay), is_integer(MaxJitter) ->
-  PlayInfo = #play_info{function = Fun, options = Opts,
-    retries = Retries, base_delay = Delay, max_delay = MaxDelay,
-    max_jitter = MaxJitter},
-  try_async_play(PlayInfo, Callback, undefined).
+bg_play(Fun, Args, Opts, Callback)
+  when is_function(Fun), is_list(Args) ->
+  Meta = create_meta(Fun, Args, Opts),
+  try_async_play(Meta, Callback, undefined).
 
 await(Ref) ->
   await(Ref, 10000).
@@ -124,51 +104,51 @@ await(Ref, Timeout) ->
   end.
 
 
-retry_play(#play_info{retries = 0}, Error) ->
+retry_play(#play_meta{retries = 0}, Error) ->
   Error;
-retry_play(#play_info{} = PlayInfo, Error) ->
-  do_retry_play(PlayInfo, Error, 1).
+retry_play(#play_meta{} = Meta, Error) ->
+  do_retry_play(Meta, Error, 1).
 
 
-do_retry_play(#play_info{retries = Retries}, Error, Attempts) when Attempts > Retries ->
-  error_logger:warning_msg("Erlplay gave up after ~p retries. "
-  "Last failure: ~p", [Retries, Error]),
+do_retry_play(#play_meta{retries = Retries, ctx = Ctx}, Error, Attempts) when Attempts > Retries ->
+  error_logger:warning_msg("Erlplay(~s) gave up after ~p retries. "
+  "Last failure: ~p", [Ctx, Retries, Error]),
   Error;
-do_retry_play(PlayInfo, Error, Attempts) ->
-  NextDelay = calculate_next_delay(PlayInfo, Attempts),
-  error_logger:warning_msg("Erlplay execution failed: ~p. "
+do_retry_play(Meta, Error, Attempts) ->
+  NextDelay = calculate_next_delay(Meta, Attempts),
+  error_logger:warning_msg("Erlplay execution: (~s) failed: ~p. "
   "Remaining attempts: ~p. Will retry in: ~pms",
-    [Error, (PlayInfo#play_info.retries - Attempts) + 1, NextDelay]),
+    [Meta#play_meta.ctx, Error, (Meta#play_meta.retries - Attempts) + 1, NextDelay]),
   timer:sleep(NextDelay),
-  #play_info{function = Fun, options = Opts} = PlayInfo,
-  try apply(Fun, Opts) of
+  #play_meta{function = Fun, args = Args} = Meta,
+  try apply(Fun, Args) of
     error ->
-      do_retry_play(PlayInfo, error, Attempts + 1);
+      do_retry_play(Meta, error, Attempts + 1);
     {error, _} = Error ->
-      do_retry_play(PlayInfo, Error, Attempts + 1);
+      do_retry_play(Meta, Error, Attempts + 1);
     Result ->
       Result
   catch
     _:Reason ->
-      do_retry_play(PlayInfo, {error, Reason}, Attempts + 1)
+      do_retry_play(Meta, {error, Reason}, Attempts + 1)
   end.
 
 
-try_async_play(PlayInfo, Callback, InitialError) ->
+try_async_play(Meta, Callback, InitialError) ->
   if is_function(Callback) ->
-    erlang:spawn(fun() -> do_try_async_play(PlayInfo, Callback, InitialError) end),
+    erlang:spawn(fun() -> do_try_async_play(Meta, Callback, InitialError) end),
     ok;
     true ->
       ClientPid = self(),
       ClientTag = make_ref(),
-      erlang:spawn(fun() -> do_try_async_play(PlayInfo,
+      erlang:spawn(fun() -> do_try_async_play(Meta,
         {ClientPid, ClientTag}, InitialError) end),
       ClientTag
   end.
 
 
-do_try_async_play(PlayInfo, CallbackOrRef, InitialError) ->
-  Result = retry_play(PlayInfo, InitialError),
+do_try_async_play(Meta, CallbackOrRef, InitialError) ->
+  Result = retry_play(Meta, InitialError),
   handle_async_play_result(Result, CallbackOrRef).
 
 handle_async_play_result(Result, CallbackOrRef) ->
@@ -187,10 +167,10 @@ handle_async_play_result(Result, CallbackOrRef) ->
   end.
 
 %% next_delay = min( [(base_delay * 2^n) +/- jitter], max_delay)
-calculate_next_delay(#play_info{
+calculate_next_delay(#play_meta{
   base_delay = BaseDelay,
   max_delay = MaxDelay,
-  max_jitter = MaxJitter}, Attempts) ->
+  jitter = MaxJitter}, Attempts) ->
   Delay =
     if BaseDelay == 0 ->
       100 * (1 bsl Attempts);
@@ -204,3 +184,32 @@ calculate_next_delay(#play_info{
       {Jitter, _} -> erlang:abs(Delay - Jitter)
     end,
   erlang:min(NewProbableDelay, MaxDelay).
+
+create_meta(Fun, Args, Opts) ->
+  lists:foreach(
+    fun({ctx, _}) ->
+      ok;
+      ({base_delay, _}) ->
+        ok;
+      ({max_delay, _}) ->
+        ok;
+      ({jitter, _}) ->
+        ok;
+      ({retries, _}) ->
+        ok;
+      (Other) ->
+        error({unknown_option, Other})
+    end, Opts),
+  Ctx = proplists:get_value(ctx, Opts, ""),
+  BaseDelay = proplists:get_value(base_delay, Opts, 0),
+  MaxDelay = proplists:get_value(max_delay, Opts, ?MAX_DELAY),
+  Jitter = proplists:get_value(jitter, Opts, ?DEFAULT_JITTER),
+  Retries = proplists:get_value(retries, Opts, ?DEFAULT_RETRIES),
+  #play_meta{
+    function = Fun, args = Args,
+    ctx = erlwater_assertions:is_string(Ctx),
+    jitter = erlwater_assertions:is_non_negative_int(Jitter),
+    retries = erlwater_assertions:is_non_negative_int(Retries),
+    base_delay = erlwater_assertions:is_non_negative_int(BaseDelay),
+    max_delay = erlwater_assertions:is_non_negative_int(MaxDelay)
+  }.

@@ -5,19 +5,19 @@
 
 -define(SERVER, ?MODULE).
 
--define(MAX_RETRIES, 5).
--define(MAX_DELAY, 32000).
+-define(DEFAULT_RETRIES, 5).
 -define(DEFAULT_JITTER, 500).
 
--define(STAGE_ERR_LOG, <<"Processing execution error. Giving up">>).
+-define(MAX_DELAY, 32000).
 
--record(play_info, {
+-record(play_meta, {
+  ctx :: string(),
   function :: function(),
-  options :: list(),
+  args :: list(),
   retries :: non_neg_integer(),
   base_delay :: non_neg_integer(),
   max_delay :: non_neg_integer(),
-  max_jitter :: non_neg_integer()
+  jitter :: non_neg_integer()
 }).
 
 
