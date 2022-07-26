@@ -21,5 +21,6 @@
   jitter :: non_neg_integer(),
   multiplier :: non_neg_integer(),
   suppress_log :: non_neg_integer(),
-  backoff :: atom()
+  backoff :: atom(),
+  retry_predicate :: function()
 }).

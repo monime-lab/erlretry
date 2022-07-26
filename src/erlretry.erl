@@ -109,12 +109,13 @@ handle_async_run_result(Result, CallbackOrRef) ->
 
 retry(#retry{retries = 0}, Error) ->
   Error;
-retry(#retry{} = Retry, Error) ->
-  do_retry(Retry, Error, 1).
+retry(#retry{retry_predicate = RetryPredicate} = Retry, Error) ->
+  do_retry(Retry, Error, apply(RetryPredicate, [Error]), 1).
 
+do_retry(_, Error, false, _) -> Error;
 
 do_retry(#retry{retries = Retries, task = Task,
-  suppress_log = HideLog}, Error, RetryCount) when RetryCount > Retries ->
+  suppress_log = HideLog}, Error, _, RetryCount) when RetryCount > Retries ->
   case HideLog of
     true ->
       ok;
@@ -122,7 +123,7 @@ do_retry(#retry{retries = Retries, task = Task,
       logger:warning("erlretry task '~s' gave up after ~p retries. Last error: ~p", [Task, RetryCount - 1, Error])
   end,
   Error;
-do_retry(Retry, Error, RetryCount) ->
+do_retry(Retry, Error, _, RetryCount) ->
   NextDelay = max(round(apply(Retry#retry.backoff, next_delay, [Retry, RetryCount])), 0),
   case Retry#retry.suppress_log of
     true ->
@@ -135,17 +136,21 @@ do_retry(Retry, Error, RetryCount) ->
         [Retry#retry.task, Error, (Retry#retry.retries - RetryCount + 1), NextDelay])
   end,
   timer:sleep(NextDelay),
+  RetryPredicate = Retry#retry.retry_predicate,
   try apply(Retry#retry.function, []) of
     error ->
-      do_retry(Retry, error, RetryCount + 1);
+      do_retry(Retry, error, apply(RetryPredicate, [error]), RetryCount + 1);
     {error, _} = NewError ->
-      do_retry(Retry, NewError, RetryCount + 1);
+      do_retry(Retry, NewError, apply(RetryPredicate, [NewError]), RetryCount + 1);
     Result ->
       Result
   catch
     _:Reason ->
-      do_retry(Retry, {error, Reason}, RetryCount + 1)
+      NewError = {error, Reason},
+      do_retry(Retry, NewError, apply(RetryPredicate, [NewError]), RetryCount + 1)
   end.
+
+retry_all_error(_) -> true.
 
 create_retry(Fun, Opts) ->
   #retry{
@@ -157,6 +162,7 @@ create_retry(Fun, Opts) ->
     max_delay = proplists:get_value(max_delay, Opts, ?DEFAULT_MAX_DELAY),
     suppress_log = proplists:get_value(suppress_log, Opts, false),
     multiplier = proplists:get_value(multiplier, Opts, ?DEFAULT_MULTIPLIER),
+    retry_predicate = proplists:get_value(retry_predicate, Opts, fun retry_all_error/1),
     backoff =
     case proplists:get_value(backoff, Opts, false) of
       exponential -> erlretry_exponential_backoff;
