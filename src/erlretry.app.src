@@ -1,8 +1,7 @@
-{application, erlplayer,
+{application, erlretry,
   [{description, "A Retry Library"},
     {vsn, "0.1.0"},
     {registered, []},
-    {mod, {erlplayer_app, []}},
     {applications,
       [kernel,
         stdlib
@@ -11,5 +10,5 @@
     {modules, []},
 
     {licenses, ["Apache 2.0"]},
-    {links, []}
+    {links, [{"GitHub", "https://github.com/monime-lab/erlretry"}]}
   ]}.
