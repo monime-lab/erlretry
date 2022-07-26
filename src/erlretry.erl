@@ -3,25 +3,34 @@
 -include("erlretry.hrl").
 
 %% API
--export([run/1, run/2]).
 -export([await/1, await/2]).
+-export([run/1, run/2, run/3, run/4]).
 
 run(Fun) ->
   run(Fun, []).
 
-run(Fun, Opts) when is_function(Fun) ->
+run(Fun, Args) ->
+  run(Fun, Args, []).
+
+run(Module, Function, Args) when is_atom(Module), is_atom(Function), is_list(Args) ->
+  run(Module, Function, Args, []);
+
+run(Fun, Args, Opts) when is_function(Fun) ->
   case proplists:get_value(mode, Opts, "") of
     async ->
-      async_run(Fun, Opts);
+      async_run(Fun, Args, Opts);
     full_async ->
-      full_async_run(Fun, Opts);
+      full_async_run(Fun, Args, Opts);
     _ ->
-      sync_run(Fun, Opts)
+      sync_run(Fun, Args, Opts)
   end.
 
-sync_run(Fun, Opts) when is_function(Fun) ->
-  Retry = create_retry(Fun, Opts),
-  try apply(Fun, []) of
+run(Module, Function, Args, Opts) when is_atom(Module), is_atom(Function), is_list(Args) ->
+  run(fun() -> apply(Module, Function, Args) end, [], Opts).
+
+sync_run(Fun, Args, Opts) when is_function(Fun) ->
+  Retry = create_retry(Fun, Args, Opts),
+  try apply(Fun, Args) of
     error ->
       retry(Retry, error);
     {error, _} = Error ->
@@ -33,14 +42,14 @@ sync_run(Fun, Opts) when is_function(Fun) ->
       retry(Retry, {error, Reason})
   end.
 
-async_run(Fun, Opts) when is_function(Fun) ->
+async_run(Fun, Args, Opts) when is_function(Fun) ->
   RetryFun =
     fun(InitialError) ->
-      do_async_run(Fun, Opts, InitialError)
+      do_async_run(Fun, Args, Opts, InitialError)
     end,
   %% First attempt playing in the calling process,
   %% then retry in the background on failure
-  try apply(Fun, []) of
+  try apply(Fun, Args) of
     error ->
       RetryFun(error);
     {error, _} = Error ->
@@ -58,10 +67,10 @@ async_run(Fun, Opts) when is_function(Fun) ->
   end.
 
 
-full_async_run(Fun, Opts) when is_function(Fun) ->
+full_async_run(Fun, Args, Opts) when is_function(Fun) ->
   Retries = proplists:get_value(retries, Opts, ?DEFAULT_RETRIES),
   Opts2 = [{retries, Retries + 1} | proplists:delete(retries, Opts)],
-  do_async_run(Fun, Opts2, undefined).
+  do_async_run(Fun, Args, Opts2, undefined).
 
 await(Ref) ->
   await(Ref, 10000).
@@ -75,8 +84,8 @@ await(Ref, Timeout) ->
   end.
 
 
-do_async_run(Fun, Opts, InitialError) ->
-  Retry = create_retry(Fun, Opts),
+do_async_run(Fun, Args, Opts, InitialError) ->
+  Retry = create_retry(Fun, Args, Opts),
   Callback = proplists:get_value(callback, Opts),
   if is_function(Callback) ->
     erlang:spawn(fun() -> do_async_run2(Retry, Callback, InitialError) end),
@@ -150,11 +159,20 @@ do_retry(Retry, Error, _, RetryCount) ->
       do_retry(Retry, NewError, apply(RetryPredicate, [NewError]), RetryCount + 1)
   end.
 
-retry_all_error(_) -> true.
+default_retry_predicate({error, undef}) -> false;
+default_retry_predicate({error, if_clause}) -> false;
+default_retry_predicate({error, {badarg, _}}) -> false;
+default_retry_predicate({error, {badfun, _}}) -> false;
+default_retry_predicate({error, {badarity, _}}) -> false;
+default_retry_predicate({error, {if_clause, _}}) -> false;
+default_retry_predicate({error, {case_clause, _}}) -> false;
+default_retry_predicate({error, {function_clause, _}}) -> false;
+default_retry_predicate(_) -> true.
 
-create_retry(Fun, Opts) ->
+create_retry(Fun, Args, Opts) ->
   #retry{
     function = Fun,
+    function_args = Args,
     task = proplists:get_value(task, Opts, "default"),
     jitter = proplists:get_value(jitter, Opts, ?DEFAULT_JITTER_FACTOR),
     retries = proplists:get_value(retries, Opts, ?DEFAULT_RETRIES),
@@ -162,7 +180,7 @@ create_retry(Fun, Opts) ->
     max_delay = proplists:get_value(max_delay, Opts, ?DEFAULT_MAX_DELAY),
     suppress_log = proplists:get_value(suppress_log, Opts, false),
     multiplier = proplists:get_value(multiplier, Opts, ?DEFAULT_MULTIPLIER),
-    retry_predicate = proplists:get_value(retry_predicate, Opts, fun retry_all_error/1),
+    retry_predicate = proplists:get_value(retry_predicate, Opts, fun default_retry_predicate/1),
     backoff =
     case proplists:get_value(backoff, Opts, false) of
       exponential -> erlretry_exponential_backoff;

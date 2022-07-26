@@ -15,6 +15,7 @@
 -record(retry, {
   task :: string(),
   function :: function(),
+  function_args :: list(),
   retries :: non_neg_integer(),
   base_delay :: non_neg_integer(),
   max_delay :: non_neg_integer(),
